@@ -1,10 +1,20 @@
-import { updateScheduleNote } from '$actions/AppStoreActions';
+import { saveSchedule, updateScheduleNote } from '$actions/AppStoreActions';
 import AppStore from '$stores/AppStore';
 import { useFallbackStore } from '$stores/FallbackStore';
-import { Box, TextField, Typography } from '@mui/material';
+import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 import { SCHEDULE_NOTE_MAX_LENGTH } from '@packages/antalmanac-types';
+import { usePostHog } from 'posthog-js/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+
+function getCurrentNote(
+    fallbackMode: boolean,
+    getCurrentFallbackSchedule: (index: number) => { scheduleNote: string }
+) {
+    return fallbackMode
+        ? getCurrentFallbackSchedule(AppStore.getCurrentScheduleIndex()).scheduleNote
+        : AppStore.getCurrentScheduleNote();
+}
 
 export function ScheduleNoteBox() {
     const { fallbackMode, getCurrentFallbackSchedule } = useFallbackStore(
@@ -13,34 +23,43 @@ export function ScheduleNoteBox() {
             getCurrentFallbackSchedule: store.getCurrentFallbackSchedule,
         }))
     );
-    const [scheduleNote, setScheduleNote] = useState(
-        fallbackMode
-            ? getCurrentFallbackSchedule(AppStore.getCurrentScheduleIndex()).scheduleNote
-            : AppStore.getCurrentScheduleNote()
-    );
-    const [scheduleIndex, setScheduleIndex] = useState(() => AppStore.getCurrentScheduleIndex());
+    const postHog = usePostHog();
 
-    const handleNoteChange = useCallback(
-        (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-            setScheduleNote(event.target.value);
-            updateScheduleNote(event.target.value, scheduleIndex);
-        },
-        [scheduleIndex]
-    );
+    const [savedNote, setSavedNote] = useState(() => getCurrentNote(fallbackMode, getCurrentFallbackSchedule));
+    const [draftNote, setDraftNote] = useState(savedNote);
+    const [scheduleIndex, setScheduleIndex] = useState(() => AppStore.getCurrentScheduleIndex());
+    const [isSaving, setIsSaving] = useState(false);
+
+    const isDirty = draftNote !== savedNote;
+
+    const handleNoteChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setDraftNote(event.target.value);
+    }, []);
+
+    const handleSave = useCallback(async () => {
+        setIsSaving(true);
+        updateScheduleNote(draftNote, scheduleIndex);
+        setSavedNote(draftNote);
+        await saveSchedule({ postHog });
+        setIsSaving(false);
+    }, [draftNote, scheduleIndex, postHog]);
+
+    const handleCancel = useCallback(() => {
+        setDraftNote(savedNote);
+    }, [savedNote]);
 
     useEffect(() => {
         const handleScheduleNoteChange = () => {
-            const { fallbackMode, getCurrentFallbackSchedule } = useFallbackStore.getState();
-            if (fallbackMode) {
-                const idx = AppStore.getCurrentScheduleIndex();
-                setScheduleNote(getCurrentFallbackSchedule(idx).scheduleNote);
-            } else {
-                setScheduleNote(AppStore.getCurrentScheduleNote());
-            }
+            const note = getCurrentNote(useFallbackStore.getState().fallbackMode, getCurrentFallbackSchedule);
+            setSavedNote(note);
+            setDraftNote(note);
         };
 
         const handleScheduleIndexChange = () => {
             setScheduleIndex(AppStore.getCurrentScheduleIndex());
+            const note = getCurrentNote(useFallbackStore.getState().fallbackMode, getCurrentFallbackSchedule);
+            setSavedNote(note);
+            setDraftNote(note);
         };
 
         AppStore.on('scheduleNotesChange', handleScheduleNoteChange);
@@ -50,7 +69,7 @@ export function ScheduleNoteBox() {
             AppStore.off('scheduleNotesChange', handleScheduleNoteChange);
             AppStore.off('currentScheduleIndexChange', handleScheduleIndexChange);
         };
-    }, []);
+    }, [getCurrentFallbackSchedule]);
 
     return (
         <Box>
@@ -62,7 +81,7 @@ export function ScheduleNoteBox() {
                 variant="filled"
                 label="Click here to start typing!"
                 onChange={handleNoteChange}
-                value={scheduleNote}
+                value={draftNote}
                 inputProps={{
                     maxLength: SCHEDULE_NOTE_MAX_LENGTH,
                     style: { cursor: fallbackMode ? 'not-allowed' : 'text' },
@@ -80,6 +99,17 @@ export function ScheduleNoteBox() {
                     },
                 }}
             />
+
+            {!fallbackMode && (
+                <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ marginTop: 1 }}>
+                    <Button onClick={handleCancel} color="inherit" disabled={!isDirty || isSaving}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSave} variant="contained" color="secondary" disabled={!isDirty || isSaving}>
+                        Save
+                    </Button>
+                </Stack>
+            )}
         </Box>
     );
 }
