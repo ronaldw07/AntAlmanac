@@ -1,10 +1,20 @@
-import { updateScheduleNote } from '$actions/AppStoreActions';
+import { saveSchedule, updateScheduleNote } from '$actions/AppStoreActions';
 import AppStore from '$stores/AppStore';
 import { useFallbackStore } from '$stores/FallbackStore';
-import { Box, TextField, Typography } from '@mui/material';
+import { Box, Button, Stack, TextField, Typography } from '@mui/material';
 import { SCHEDULE_NOTE_MAX_LENGTH } from '@packages/antalmanac-types';
-import { useCallback, useEffect, useState } from 'react';
+import { usePostHog } from 'posthog-js/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+
+function getCurrentNote(
+    fallbackMode: boolean,
+    getCurrentFallbackSchedule: (index: number) => { scheduleNote: string }
+) {
+    return fallbackMode
+        ? getCurrentFallbackSchedule(AppStore.getCurrentScheduleIndex()).scheduleNote
+        : AppStore.getCurrentScheduleNote();
+}
 
 export function ScheduleNoteBox() {
     const { fallbackMode, getCurrentFallbackSchedule } = useFallbackStore(
@@ -13,34 +23,62 @@ export function ScheduleNoteBox() {
             getCurrentFallbackSchedule: store.getCurrentFallbackSchedule,
         }))
     );
-    const [scheduleNote, setScheduleNote] = useState(
-        fallbackMode
-            ? getCurrentFallbackSchedule(AppStore.getCurrentScheduleIndex()).scheduleNote
-            : AppStore.getCurrentScheduleNote()
-    );
-    const [scheduleIndex, setScheduleIndex] = useState(() => AppStore.getCurrentScheduleIndex());
+    const postHog = usePostHog();
 
-    const handleNoteChange = useCallback(
-        (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-            setScheduleNote(event.target.value);
-            updateScheduleNote(event.target.value, scheduleIndex);
+    const [scheduleNote, setScheduleNote] = useState(() => getCurrentNote(fallbackMode, getCurrentFallbackSchedule));
+    const [persistedNote, setPersistedNote] = useState(scheduleNote);
+    const [scheduleIndex, setScheduleIndex] = useState(() => AppStore.getCurrentScheduleIndex());
+    const [isSaving, setIsSaving] = useState(false);
+
+    /** Distinguishes our own edits echoing back via 'scheduleNotesChange' from external schedule loads. */
+    const lastLocalEdit = useRef<string | null>(null);
+
+    const isDirty = scheduleNote !== persistedNote;
+
+    const writeNote = useCallback(
+        (note: string) => {
+            lastLocalEdit.current = note;
+            setScheduleNote(note);
+            updateScheduleNote(note, scheduleIndex);
         },
         [scheduleIndex]
     );
 
+    const handleNoteChange = useCallback(
+        (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+            writeNote(event.target.value);
+        },
+        [writeNote]
+    );
+
+    const handleSave = useCallback(async () => {
+        setIsSaving(true);
+        await saveSchedule({ postHog });
+        setPersistedNote(scheduleNote);
+        setIsSaving(false);
+    }, [scheduleNote, postHog]);
+
+    const handleCancel = useCallback(() => {
+        writeNote(persistedNote);
+    }, [persistedNote, writeNote]);
+
     useEffect(() => {
         const handleScheduleNoteChange = () => {
-            const { fallbackMode, getCurrentFallbackSchedule } = useFallbackStore.getState();
-            if (fallbackMode) {
-                const idx = AppStore.getCurrentScheduleIndex();
-                setScheduleNote(getCurrentFallbackSchedule(idx).scheduleNote);
-            } else {
-                setScheduleNote(AppStore.getCurrentScheduleNote());
+            const note = getCurrentNote(useFallbackStore.getState().fallbackMode, getCurrentFallbackSchedule);
+            setScheduleNote(note);
+
+            // An external change (schedule load, copy, import) replaces the persisted baseline.
+            if (note !== lastLocalEdit.current) {
+                setPersistedNote(note);
             }
         };
 
         const handleScheduleIndexChange = () => {
             setScheduleIndex(AppStore.getCurrentScheduleIndex());
+            const note = getCurrentNote(useFallbackStore.getState().fallbackMode, getCurrentFallbackSchedule);
+            lastLocalEdit.current = null;
+            setScheduleNote(note);
+            setPersistedNote(note);
         };
 
         AppStore.on('scheduleNotesChange', handleScheduleNoteChange);
@@ -50,7 +88,7 @@ export function ScheduleNoteBox() {
             AppStore.off('scheduleNotesChange', handleScheduleNoteChange);
             AppStore.off('currentScheduleIndexChange', handleScheduleIndexChange);
         };
-    }, []);
+    }, [getCurrentFallbackSchedule]);
 
     return (
         <Box>
@@ -80,6 +118,17 @@ export function ScheduleNoteBox() {
                     },
                 }}
             />
+
+            {!fallbackMode && (
+                <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ marginTop: 1 }}>
+                    <Button onClick={handleCancel} color="inherit" disabled={!isDirty || isSaving}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSave} variant="contained" color="secondary" disabled={!isDirty || isSaving}>
+                        Save
+                    </Button>
+                </Stack>
+            )}
         </Box>
     );
 }
