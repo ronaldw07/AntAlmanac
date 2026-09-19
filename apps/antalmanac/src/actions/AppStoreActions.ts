@@ -98,7 +98,7 @@ function enrichSaveStateWithVisibility(saveState: ReturnType<typeof AppStore.sch
     };
 }
 
-const saveSchedule = async ({ postHog }: { postHog?: PostHog }) => {
+export const saveSchedule = async ({ postHog }: { postHog?: PostHog }) => {
     const scheduleSaveState = enrichSaveStateWithVisibility(AppStore.schedule.getScheduleAsSaveState());
 
     if (
