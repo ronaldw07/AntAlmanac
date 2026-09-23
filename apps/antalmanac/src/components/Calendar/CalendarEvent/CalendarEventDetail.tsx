@@ -12,18 +12,24 @@ import AppStore from '$stores/AppStore';
 import { formatTimes } from '$stores/calendarizeHelpers';
 import { useTimeFormatStore } from '$stores/SettingsStore';
 import { Delete, Search } from '@mui/icons-material';
-import { Box, Button, Chip, IconButton, Paper, Tooltip } from '@mui/material';
+import { Box, Button, Chip, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { usePostHog } from 'posthog-js/react';
 import { useRef } from 'react';
 
 interface CalendarEventDetailProps {
     selectedEvent: CourseEvent | CustomEvent;
     closePopover: () => void;
+    /**
+     * When true, renders a compact layout in a plain Box instead of its own
+     * Paper, so it can sit inline inside another surface — e.g. the mobile
+     * bottom sheet — instead of floating in a Popover.
+     */
+    embedded?: boolean;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function CalendarEventDetail({ selectedEvent, closePopover }: CalendarEventDetailProps) {
+export function CalendarEventDetail({ selectedEvent, closePopover, embedded = false }: CalendarEventDetailProps) {
     const paperRef = useRef<HTMLDivElement>(null);
     const quickSearch = useQuickSearch();
     const isMilitaryTime = useTimeFormatStore((store) => store.isMilitaryTime);
@@ -56,45 +62,145 @@ export function CalendarEventDetail({ selectedEvent, closePopover }: CalendarEve
             quickSearch(deptValue, courseNumber, term);
         };
 
-        return (
-            <Paper sx={{ padding: '0.5rem', minWidth: '15rem' }} ref={paperRef}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '0.25rem',
+        // Tighter row spacing when embedded in the mobile bottom sheet, where
+        // vertical space is at a premium.
+        const cellStyle = embedded ? { padding: '1px 0', lineHeight: 1.3 } : undefined;
+
+        const header = (
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.25rem',
+                }}
+            >
+                <Tooltip title="Quick Search (or CMD/CTRL + Click event)">
+                    <Button size="small" color="secondary" onClick={handleQuickSearch}>
+                        <Search fontSize="small" style={{ marginRight: 5 }} />
+                        <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{`${title} ${sectionType}`}</span>
+                    </Button>
+                </Tooltip>
+                <Tooltip title="Delete">
+                    <IconButton
+                        size="small"
+                        style={{ textDecoration: 'underline' }}
+                        onClick={() => {
+                            closePopover();
+                            deleteCourse(sectionCode, term, AppStore.getCurrentScheduleIndex());
+                            logAnalytics(postHog, {
+                                category: analyticsEnum.calendar,
+                                action: analyticsEnum.calendar.actions.DELETE_COURSE,
+                            });
+                        }}
+                    >
+                        <Delete fontSize="inherit" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+        );
+
+        if (embedded) {
+            const labelSx = { opacity: 0.7, mr: 0.5, fontSize: '0.72rem' };
+            const valueSx = { fontSize: '0.78rem', fontWeight: 500 };
+
+            return (
+                <Box ref={paperRef}>
+                    {header}
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            columnGap: 1.5,
+                            rowGap: 0.25,
+                            mb: 0.5,
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography component="span" sx={labelSx}>
+                                Section
+                            </Typography>
+                            <Tooltip title="Click to copy section code" placement="right">
+                                <Chip
+                                    onClick={(event) => {
+                                        clickToCopy(event, sectionCode);
+                                        logAnalytics(postHog, {
+                                            category: analyticsEnum.calendar,
+                                            action: analyticsEnum.calendar.actions.COPY_COURSE_CODE,
+                                        });
+                                    }}
+                                    label={sectionCode}
+                                    size="small"
+                                    sx={{ height: 18, fontSize: '0.68rem' }}
+                                />
+                            </Tooltip>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography component="span" sx={labelSx}>
+                                Term
+                            </Typography>
+                            <Typography component="span" sx={valueSx}>
+                                {term.shortName}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography component="span" sx={labelSx}>
+                                Final
+                            </Typography>
+                            <Typography component="span" sx={valueSx}>
+                                {finalExamString}
+                            </Typography>
+                        </Box>
+                        <ColorPicker
+                            color={selectedEvent.color}
+                            isCustomEvent={false}
+                            sectionCode={sectionCode}
+                            term={term}
+                            analyticsCategory={analyticsEnum.calendar}
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', mb: 0.25 }}>
+                        <Typography component="span" sx={labelSx}>
+                            Instructors
+                        </Typography>
+                        <Typography component="span" sx={valueSx}>
+                            {instructors.join(', ')}
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Typography component="span" sx={labelSx}>
+                            Location{locations.length > 1 && 's'}
+                        </Typography>
+                        {locations.map((location) => (
+                            <Box key={`${sectionCode} @ ${location.building} ${location.room}`} sx={valueSx}>
+                                <MapLink
+                                    buildingId={locationIds[location.building] ?? '0'}
+                                    room={`${location.building} ${location.room}`}
+                                />
+                            </Box>
+                        ))}
+                    </Box>
+                </Box>
+            );
+        }
+
+        const content = (
+            <>
+                {header}
+                <table
+                    style={{
+                        border: 'none',
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: embedded ? '0.82rem' : '0.9rem',
                     }}
                 >
-                    <Tooltip title="Quick Search (or CMD/CTRL + Click event)">
-                        <Button size="small" color="secondary" onClick={handleQuickSearch}>
-                            <Search fontSize="small" style={{ marginRight: 5 }} />
-                            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{`${title} ${sectionType}`}</span>
-                        </Button>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                        <IconButton
-                            size="small"
-                            style={{ textDecoration: 'underline' }}
-                            onClick={() => {
-                                closePopover();
-                                deleteCourse(sectionCode, term, AppStore.getCurrentScheduleIndex());
-                                logAnalytics(postHog, {
-                                    category: analyticsEnum.calendar,
-                                    action: analyticsEnum.calendar.actions.DELETE_COURSE,
-                                });
-                            }}
-                        >
-                            <Delete fontSize="inherit" />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-                <table style={{ border: 'none', width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                     <tbody>
                         <tr>
-                            <td style={{ verticalAlign: 'top' }}>Section code</td>
+                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Section code</td>
                             <Tooltip title="Click to copy section code" placement="right">
-                                <td style={{ textAlign: 'right' }}>
+                                <td style={{ textAlign: 'right', ...cellStyle }}>
                                     <Chip
                                         onClick={(event) => {
                                             clickToCopy(event, sectionCode);
@@ -105,21 +211,26 @@ export function CalendarEventDetail({ selectedEvent, closePopover }: CalendarEve
                                         }}
                                         label={sectionCode}
                                         size="small"
+                                        sx={embedded ? { height: 20, fontSize: '0.72rem' } : undefined}
                                     />
                                 </td>
                             </Tooltip>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top' }}>Term</td>
-                            <td style={{ textAlign: 'right' }}>{term.shortName}</td>
+                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Term</td>
+                            <td style={{ textAlign: 'right', ...cellStyle }}>{term.shortName}</td>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top' }}>Instructors</td>
-                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>{instructors.join('\n')}</td>
+                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Instructors</td>
+                            <td style={{ whiteSpace: 'pre', textAlign: 'right', ...cellStyle }}>
+                                {instructors.join('\n')}
+                            </td>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top' }}>Location{locations.length > 1 && 's'}</td>
-                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>
+                            <td style={{ verticalAlign: 'top', ...cellStyle }}>
+                                Location{locations.length > 1 && 's'}
+                            </td>
+                            <td style={{ whiteSpace: 'pre', textAlign: 'right', ...cellStyle }}>
                                 {locations.map((location) => (
                                     <div key={`${sectionCode} @ ${location.building} ${location.room}`}>
                                         <MapLink
@@ -131,12 +242,12 @@ export function CalendarEventDetail({ selectedEvent, closePopover }: CalendarEve
                             </td>
                         </tr>
                         <tr>
-                            <td>Final</td>
-                            <td style={{ textAlign: 'right' }}>{finalExamString}</td>
+                            <td style={cellStyle}>Final</td>
+                            <td style={{ textAlign: 'right', ...cellStyle }}>{finalExamString}</td>
                         </tr>
                         <tr>
-                            <td>Color</td>
-                            <td style={{ textAlign: 'right' }}>
+                            <td style={cellStyle}>Color</td>
+                            <td style={{ textAlign: 'right', ...cellStyle }}>
                                 <ColorPicker
                                     color={selectedEvent.color}
                                     isCustomEvent={false}
@@ -148,6 +259,12 @@ export function CalendarEventDetail({ selectedEvent, closePopover }: CalendarEve
                         </tr>
                     </tbody>
                 </table>
+            </>
+        );
+
+        return (
+            <Paper sx={{ padding: '0.5rem', minWidth: '15rem' }} ref={paperRef}>
+                {content}
             </Paper>
         );
     }

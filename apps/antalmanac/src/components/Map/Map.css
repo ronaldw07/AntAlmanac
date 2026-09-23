@@ -23,5 +23,29 @@
  */
 .leaflet-popup-content-wrapper {
     padding: 0;
-    width: 250px;
+    width: auto;
+}
+
+/**
+ * Default close button is faint grey text with no backing, so it disappears
+ * against the marker card's building photo. Give it a solid circle so it
+ * stays legible no matter what's behind it.
+ */
+.leaflet-popup-close-button {
+    color: #333 !important;
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    width: 22px !important;
+    height: 22px !important;
+    line-height: 22px !important;
+    text-align: center;
+    top: 6px !important;
+    right: 6px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 50% !important;
+}
+
+.leaflet-popup-close-button:hover {
+    color: #000 !important;
+    background: #fff !important;
 }
