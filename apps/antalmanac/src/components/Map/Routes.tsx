@@ -58,6 +58,10 @@ export function Routes(props: ClassRoutesProps) {
              */
             fitSelectedRoutes: false,
 
+            // Default handler console.errors on failure (e.g. no Mapbox token
+            // in local dev). Fail silently instead.
+            defaultErrorHandler: () => {},
+
             plan: L.Routing.plan(waypoints, {
                 addWaypoints: false,
                 createMarker: dontCreateMarker,
@@ -126,6 +130,21 @@ export function Routes(props: ClassRoutesProps) {
                 return line;
             },
         });
+
+        // The route request is async. If this effect's cleanup removes the
+        // control (e.g. switching days) before the request resolves,
+        // leaflet-routing-machine's response handler still runs and calls
+        // `this._map.removeLayer(...)` — but `_map` is already null, which
+        // throws. Guard the actual call site instead of the in-flight request.
+        const internalControl = routerControl as unknown as {
+            _clearLines: () => void;
+            _map: L.Map | null;
+        };
+        const originalClearLines = internalControl._clearLines.bind(internalControl);
+        internalControl._clearLines = () => {
+            if (!internalControl._map) return;
+            originalClearLines();
+        };
 
         routerControl.addTo(map);
         routerControl.hide();
