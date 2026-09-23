@@ -29,23 +29,24 @@
 /**
  * Default close button is faint grey text with no backing, so it disappears
  * against the marker card's building photo. Give it a solid circle so it
- * stays legible no matter what's behind it.
+ * stays legible no matter what's behind it. Same selectors as leaflet.css
+ * (imported before this file) so these win without !important.
  */
-.leaflet-popup-close-button {
-    color: #333 !important;
-    font-weight: 700 !important;
-    font-size: 16px !important;
-    width: 22px !important;
-    height: 22px !important;
-    line-height: 22px !important;
-    text-align: center;
-    top: 6px !important;
-    right: 6px !important;
-    background: rgba(255, 255, 255, 0.9) !important;
-    border-radius: 50% !important;
+.leaflet-container a.leaflet-popup-close-button {
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 22px;
+    color: #333;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
 }
 
-.leaflet-popup-close-button:hover {
-    color: #000 !important;
-    background: #fff !important;
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+    color: #000;
+    background: #fff;
 }
