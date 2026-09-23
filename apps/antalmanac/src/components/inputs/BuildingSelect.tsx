@@ -57,6 +57,19 @@ export function BuildingSelect(props: BuildingSelectProps) {
             isOptionEqualToValue={(option, value) => option.id === value?.id}
             getOptionLabel={(option) => option.name ?? ''}
             onChange={handleChange}
+            sx={{
+                // Default icon padding is too tight a touch target on mobile —
+                // a real tap easily lands just outside it and misses.
+                '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
+                    padding: '10px',
+                },
+                // A little breathing room so a tap can't land on the wrong
+                // one of the two adjacent icons.
+                '& .MuiAutocomplete-endAdornment': {
+                    display: 'flex',
+                    gap: '4px',
+                },
+            }}
             renderInput={(params) => (
                 <TextField
                     {...params}
