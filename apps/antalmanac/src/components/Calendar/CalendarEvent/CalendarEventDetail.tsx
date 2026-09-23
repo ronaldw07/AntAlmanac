@@ -62,10 +62,6 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
             quickSearch(deptValue, courseNumber, term);
         };
 
-        // Tighter row spacing when embedded in the mobile bottom sheet, where
-        // vertical space is at a premium.
-        const cellStyle = embedded ? { padding: '1px 0', lineHeight: 1.3 } : undefined;
-
         const header = (
             <Box
                 sx={{
@@ -185,22 +181,15 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
             );
         }
 
-        const content = (
-            <>
+        return (
+            <Paper sx={{ padding: '0.5rem', minWidth: '15rem' }} ref={paperRef}>
                 {header}
-                <table
-                    style={{
-                        border: 'none',
-                        width: '100%',
-                        borderCollapse: 'collapse',
-                        fontSize: embedded ? '0.82rem' : '0.9rem',
-                    }}
-                >
+                <table style={{ border: 'none', width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                     <tbody>
                         <tr>
-                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Section code</td>
+                            <td style={{ verticalAlign: 'top' }}>Section code</td>
                             <Tooltip title="Click to copy section code" placement="right">
-                                <td style={{ textAlign: 'right', ...cellStyle }}>
+                                <td style={{ textAlign: 'right' }}>
                                     <Chip
                                         onClick={(event) => {
                                             clickToCopy(event, sectionCode);
@@ -211,26 +200,21 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                                         }}
                                         label={sectionCode}
                                         size="small"
-                                        sx={embedded ? { height: 20, fontSize: '0.72rem' } : undefined}
                                     />
                                 </td>
                             </Tooltip>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Term</td>
-                            <td style={{ textAlign: 'right', ...cellStyle }}>{term.shortName}</td>
+                            <td style={{ verticalAlign: 'top' }}>Term</td>
+                            <td style={{ textAlign: 'right' }}>{term.shortName}</td>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top', ...cellStyle }}>Instructors</td>
-                            <td style={{ whiteSpace: 'pre', textAlign: 'right', ...cellStyle }}>
-                                {instructors.join('\n')}
-                            </td>
+                            <td style={{ verticalAlign: 'top' }}>Instructors</td>
+                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>{instructors.join('\n')}</td>
                         </tr>
                         <tr>
-                            <td style={{ verticalAlign: 'top', ...cellStyle }}>
-                                Location{locations.length > 1 && 's'}
-                            </td>
-                            <td style={{ whiteSpace: 'pre', textAlign: 'right', ...cellStyle }}>
+                            <td style={{ verticalAlign: 'top' }}>Location{locations.length > 1 && 's'}</td>
+                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>
                                 {locations.map((location) => (
                                     <div key={`${sectionCode} @ ${location.building} ${location.room}`}>
                                         <MapLink
@@ -242,12 +226,12 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                             </td>
                         </tr>
                         <tr>
-                            <td style={cellStyle}>Final</td>
-                            <td style={{ textAlign: 'right', ...cellStyle }}>{finalExamString}</td>
+                            <td>Final</td>
+                            <td style={{ textAlign: 'right' }}>{finalExamString}</td>
                         </tr>
                         <tr>
-                            <td style={cellStyle}>Color</td>
-                            <td style={{ textAlign: 'right', ...cellStyle }}>
+                            <td>Color</td>
+                            <td style={{ textAlign: 'right' }}>
                                 <ColorPicker
                                     color={selectedEvent.color}
                                     isCustomEvent={false}
@@ -259,12 +243,6 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                         </tr>
                     </tbody>
                 </table>
-            </>
-        );
-
-        return (
-            <Paper sx={{ padding: '0.5rem', minWidth: '15rem' }} ref={paperRef}>
-                {content}
             </Paper>
         );
     }
