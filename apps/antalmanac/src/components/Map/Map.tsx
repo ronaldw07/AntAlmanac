@@ -379,18 +379,17 @@ export function CourseMap() {
     /**
      * When a class is clicked on the calendar: switch the map's day filter to
      * match that class's day (unless it's on "All"), and fly to its building
-     * right away. The lookup
-     * uses the full, unfiltered `markers` map (not the day-filtered
-     * `markersToDisplay`) so it doesn't have to wait for the day switch above
-     * to be re-rendered first — doing so previously raced the two effects and
-     * caused clicks after the first to miss, land on stale data, or re-fire
-     * repeatedly. `lastHandledClickKeyRef` dedupes by (section, day) so the
-     * effect only acts once per distinct click — a class that meets on
-     * multiple days is a different click per day and must still switch the
-     * day tab each time, even though its section key repeats.
+     * right away. The lookup uses the full, unfiltered `markers` map (not the
+     * day-filtered `markersToDisplay`) so it doesn't have to wait for the day
+     * switch above to be re-rendered first — doing so previously raced the two
+     * effects and caused clicks after the first to miss, land on stale data,
+     * or re-fire repeatedly. `lastHandledClickKeyRef` dedupes by (section, day)
+     * so the effect only acts once per click; it's cleared when the selection
+     * is, so clicking the same class again later still jumps.
      */
     useEffect(() => {
         if (!selectedEvent || !isCourseEvent(selectedEvent)) {
+            lastHandledClickKeyRef.current = null;
             return;
         }
 
