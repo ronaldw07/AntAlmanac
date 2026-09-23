@@ -7,8 +7,13 @@ import { cloneElement, isValidElement, memo, useCallback } from 'react';
 import type { EventWrapperProps } from 'react-big-calendar';
 
 interface CalendarEventWrapperProps extends EventWrapperProps<CalendarEvent> {
-    children?: React.ReactElement<{ onClick: (e: React.MouseEvent) => void }>;
+    children?: React.ReactElement<{ onClick: (e: React.MouseEvent) => void; style?: React.CSSProperties }>;
 }
+
+// Matches react-big-calendar's `.rbc-event:focus` ring. The details popover
+// steals focus on click, so without this the tile only turns blue once the
+// popover closes and hands focus back.
+const SELECTED_OUTLINE = '5px auto #3b99fc';
 
 /**
  * CalendarEventWrapper allows us to override the default onClick event behavior which problematically rerenders the entire calendar.
@@ -42,7 +47,12 @@ export const CalendarEventWrapper = memo(function CalendarEventWrapper({
 
     return (
         <div style={isSelected ? { zIndex: 10 } : undefined}>
-            {isValidElement(children) ? cloneElement(children, { onClick: handleClick }) : children}
+            {isValidElement(children)
+                ? cloneElement(children, {
+                      onClick: handleClick,
+                      ...(isSelected && { style: { ...children.props.style, outline: SELECTED_OUTLINE } }),
+                  })
+                : children}
         </div>
     );
 });
