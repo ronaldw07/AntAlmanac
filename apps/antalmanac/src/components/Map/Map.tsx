@@ -3,7 +3,6 @@ import 'leaflet.locatecontrol/dist/L.Control.Locate.min.css';
 import './Map.css';
 import { Box, Paper, Tab, Tabs, Typography } from '@mui/material';
 import { type CustomEventId } from '@packages/antalmanac-types';
-import { isSameDay } from 'date-fns';
 import { type LatLngTuple, type Map, Marker } from 'leaflet';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -53,16 +52,15 @@ const WORK_WEEK = ['All', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const FULL_WEEK = ['All', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const weekendIndices = [0, 6];
 // Index-matched to Date.getDay() (0 = Sunday).
-const WEEKDAY_ABBREVIATIONS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-// Calendar events are calendarized onto this fixed fake week (a Monday); its
-// getDay() values line up 1:1 with real Date.getDay() values, so `new
-// Date(CALENDAR_STRIP_YEAR, CALENDAR_STRIP_MONTH, dayOfWeekNumber)` lands on
-// the matching day of that fake week.
-const CALENDAR_STRIP_YEAR = 2018;
-const CALENDAR_STRIP_MONTH = 0;
+const WEEKDAY_ABBREVIATIONS = FULL_WEEK.slice(1);
 // UCI's day notation ("MWF", "TuTh"), index-matched to Date.getDay().
 const UCI_DAY_LETTERS = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
 const mondayFirst = (weekday: number) => (weekday + 6) % 7;
+
+/** The map's day tabs: weekend tabs only appear when something is scheduled on a weekend. */
+function getDays(events: CalendarEvent[]) {
+    return events.some((event) => weekendIndices.includes(event.start.getDay())) ? FULL_WEEK : WORK_WEEK;
+}
 const CAMPUS_CENTER: LatLngTuple = [33.6459, -117.842717];
 const CAMPUS_BOUND_DELTA = 0.018;
 const CAMPUS_BOUNDS: [LatLngTuple, LatLngTuple] = [
@@ -190,11 +188,10 @@ export function CourseMap() {
         if (!isMobile) {
             return 0;
         }
-        // On mobile, land on today's day tab instead of "All" so the strip
-        // (which needs one specific day) isn't empty on open.
-        const todayAbbreviation = WEEKDAY_ABBREVIATIONS[new Date().getDay()];
-        const workWeekIndex = WORK_WEEK.indexOf(todayAbbreviation);
-        return workWeekIndex === -1 ? WORK_WEEK.indexOf('Mon') : workWeekIndex;
+        // On mobile, open on today's tab (Monday if today's tab isn't shown).
+        const initialDays = getDays(AppStore.getEventsInCalendar());
+        const todayIndex = initialDays.indexOf(WEEKDAY_ABBREVIATIONS[new Date().getDay()]);
+        return todayIndex === -1 ? initialDays.indexOf('Mon') : todayIndex;
     });
     const lastHandledClickKeyRef = useRef<string | null>(null);
     const [pendingPopupSectionKey, setPendingPopupSectionKey] = useState<string | null>(null);
@@ -276,10 +273,7 @@ export function CourseMap() {
         [router]
     );
 
-    const days = useMemo(() => {
-        const hasWeekendEvent = calendarEvents.some((event) => weekendIndices.includes(event.start.getDay()));
-        return hasWeekendEvent ? FULL_WEEK : WORK_WEEK;
-    }, [calendarEvents]);
+    const days = useMemo(() => getDays(calendarEvents), [calendarEvents]);
 
     const today = useMemo(() => {
         return days[selectedDayIndex];
@@ -304,8 +298,8 @@ export function CourseMap() {
             );
         }
 
-        const dayDate = new Date(CALENDAR_STRIP_YEAR, CALENDAR_STRIP_MONTH, WEEKDAY_ABBREVIATIONS.indexOf(today));
-        return courseEvents.filter((event) => isSameDay(event.start, dayDate));
+        const weekday = WEEKDAY_ABBREVIATIONS.indexOf(today);
+        return courseEvents.filter((event) => event.start.getDay() === weekday);
     }, [calendarEvents, today]);
 
     /** On "All", each class's meeting days (e.g. "MWF"), keyed by section, to label its strip chip. */
@@ -377,15 +371,11 @@ export function CourseMap() {
     }, [markers, today]);
 
     /**
-     * When a class is clicked on the calendar: switch the map's day filter to
-     * match that class's day (unless it's on "All"), and fly to its building
-     * right away. The lookup uses the full, unfiltered `markers` map (not the
-     * day-filtered `markersToDisplay`) so it doesn't have to wait for the day
-     * switch above to be re-rendered first — doing so previously raced the two
-     * effects and caused clicks after the first to miss, land on stale data,
-     * or re-fire repeatedly. `lastHandledClickKeyRef` dedupes by (section, day)
-     * so the effect only acts once per click; it's cleared when the selection
-     * is, so clicking the same class again later still jumps.
+     * When a class is selected: switch the map's day filter to that class's day
+     * (unless on "All") and fly to its building. Looks up the unfiltered
+     * `markers` so it doesn't wait for the day switch to re-render.
+     * `lastHandledClickKeyRef` makes it act once per selection, since the day
+     * switch re-runs this effect.
      */
     useEffect(() => {
         if (!selectedEvent || !isCourseEvent(selectedEvent)) {
@@ -504,12 +494,7 @@ export function CourseMap() {
         );
     }, [markersToDisplay, customEventMarkersToDisplay]);
 
-    // Derive stable route descriptors from `startDestPairs` so `latLngTuples`
-    // keeps the same array identity across renders that don't actually change
-    // the route. Routes.tsx's effect depends on that identity to decide when
-    // to rebuild its (async) Leaflet routing control; rebuilding on every
-    // unrelated render races a stale in-flight request against a torn-down
-    // control and crashes leaflet-routing-machine.
+    // Memoized so each route's `latLngTuples` keeps its identity; Routes rebuilds its control when it changes.
     const routes = useMemo(
         () =>
             startDestPairs.map((startDestPair, pairIndex) => {
