@@ -91,18 +91,18 @@ export const LocationMarker = forwardRef(
                     },
                 }}
             >
-                <Popup>
+                <Popup autoPan={true} autoPanPaddingTopLeft={[10, 170]} autoPanPaddingBottomRight={[10, 190]}>
                     <Box
                         sx={{
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
-                            width: 250,
+                            width: 190,
                         }}
                     >
                         {image && (
                             <Box
-                                height={150}
+                                height={80}
                                 borderRadius={'0.75rem 0.75rem 0 0'}
                                 component="img"
                                 src={`${IMAGE_CMS_URL}${image}`}
@@ -113,20 +113,20 @@ export const LocationMarker = forwardRef(
                             />
                         )}
 
-                        <Box display="flex" flexDirection="column" mx={2} my={1.25} gap={1}>
-                            <Box display="flex" flexDirection="column" gap={0.5}>
+                        <Box display="flex" flexDirection="column" mx={1.25} my={0.75} gap={0.5}>
+                            <Box display="flex" flexDirection="column" gap={0.25}>
                                 <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                    <Typography fontSize={'1.25rem'} lineHeight={1.25} fontWeight={600}>
+                                    <Typography fontSize={'0.95rem'} lineHeight={1.2} fontWeight={600}>
                                         {location}
                                     </Typography>
                                     {location && (
                                         <IconButton
                                             href={`http://www.classrooms.uci.edu/classrooms/${acronym}`}
                                             target="_blank"
-                                            size="medium"
+                                            size="small"
                                             sx={{ padding: 0 }}
                                         >
-                                            <Info fontSize="large" color="primary" />
+                                            <Info fontSize="small" color="primary" />
                                         </IconButton>
                                     )}
                                 </Box>
@@ -137,6 +137,7 @@ export const LocationMarker = forwardRef(
                             <Button
                                 variant="contained"
                                 color="primary"
+                                size="small"
                                 startIcon={
                                     <DirectionsWalkIcon sx={{ color: (theme) => theme.vars.palette.common.white }} />
                                 }
@@ -150,8 +151,8 @@ export const LocationMarker = forwardRef(
                             >
                                 <Typography
                                     sx={{
-                                        fontSize: '1.25rem',
-                                        letterSpacing: 1.25,
+                                        fontSize: '0.9rem',
+                                        letterSpacing: 0.75,
                                         fontWeight: 500,
                                         color: (theme) => theme.vars.palette.common.white,
                                     }}
