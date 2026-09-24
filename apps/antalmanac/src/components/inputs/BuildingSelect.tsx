@@ -38,7 +38,7 @@ export function BuildingSelect(props: BuildingSelectProps) {
     );
 
     const value = useMemo(() => {
-        // Must be null, not undefined: MUI treats anything but null as a selection.
+        // null, not undefined: undefined flips Autocomplete to uncontrolled and still counts as a selection.
         if (props.value == null) {
             return null;
         }
@@ -59,17 +59,6 @@ export function BuildingSelect(props: BuildingSelectProps) {
             getOptionLabel={(option) => option.name ?? ''}
             onChange={handleChange}
             sx={{
-                // Default icon padding is too tight a touch target on mobile —
-                // a real tap easily lands just outside it and misses.
-                '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator': {
-                    padding: '10px',
-                },
-                // A little breathing room so a tap can't land on the wrong
-                // one of the two adjacent icons.
-                '& .MuiAutocomplete-endAdornment': {
-                    display: 'flex',
-                    gap: '4px',
-                },
                 // MUI shows the clear button only on hover or while focused. Touch has no hover, and
                 // Leaflet steals focus on mousedown inside the map, hiding it mid-tap so the tap misses.
                 '@media (pointer: coarse)': {
