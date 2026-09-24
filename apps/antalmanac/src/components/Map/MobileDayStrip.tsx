@@ -7,7 +7,7 @@ import { useSelectedEventStore } from '$stores/SelectedEventStore';
 import { ExpandMore } from '@mui/icons-material';
 import { Box, Collapse, Divider, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns';
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 interface MobileDayStripProps {
@@ -69,23 +69,24 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
         updateScrollFade();
     }, [events]);
 
+    // Leaving the map (e.g. switching tabs) drops the selection so it doesn't carry over.
+    useEffect(() => () => setSelectedEvent(null, null), [setSelectedEvent]);
+
     if (events.length === 0) {
         return null;
     }
 
-    const handleChipClick = (mouseEvent: MouseEvent<HTMLButtonElement>, event: CourseEvent) => {
-        if (activeEvent === event) {
-            setSelectedEvent(null, null);
-            return;
-        }
-        setSelectedEvent(mouseEvent, event);
+    const handleChipClick = (event: CourseEvent) => {
+        // No anchor element: that's only for the calendar's popover, which would otherwise open
+        // anchored to this chip once the map (and chip) are gone.
+        setSelectedEvent(null, activeEvent === event ? null : event);
     };
 
     return (
         <Paper
             sx={{
                 position: 'absolute',
-                bottom: 'calc(60px + env(safe-area-inset-bottom))',
+                bottom: 60,
                 left: 12,
                 right: 12,
                 zIndex: 450,
@@ -146,13 +147,13 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
                             <Box
                                 key={`${event.term.shortName}-${event.sectionCode}-${event.start.getTime()}`}
                                 component="button"
-                                onClick={(mouseEvent: MouseEvent<HTMLButtonElement>) =>
-                                    handleChipClick(mouseEvent, event)
-                                }
+                                onClick={() => handleChipClick(event)}
+                                aria-pressed={activeEvent === event}
                                 sx={{
                                     flexShrink: 0,
                                     textAlign: 'left',
-                                    border: activeEvent === event ? '2px solid white' : 'none',
+                                    border: '2px solid',
+                                    borderColor: activeEvent === event ? 'white' : 'transparent',
                                     borderRadius: 2,
                                     boxShadow: 4,
                                     px: 1.5,
