@@ -96,6 +96,33 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
             </Box>
         );
 
+        const handleCopySectionCode = (event: React.MouseEvent<HTMLElement>) => {
+            clickToCopy(event, sectionCode);
+            logAnalytics(postHog, {
+                category: analyticsEnum.calendar,
+                action: analyticsEnum.calendar.actions.COPY_COURSE_CODE,
+            });
+        };
+
+        const colorPicker = (
+            <ColorPicker
+                color={selectedEvent.color}
+                isCustomEvent={false}
+                sectionCode={sectionCode}
+                term={term}
+                analyticsCategory={analyticsEnum.calendar}
+            />
+        );
+
+        const locationLinks = locations.map((location) => (
+            <div key={`${sectionCode} @ ${location.building} ${location.room}`}>
+                <MapLink
+                    buildingId={locationIds[location.building] ?? '0'}
+                    room={`${location.building} ${location.room}`}
+                />
+            </div>
+        ));
+
         if (embedded) {
             const labelSx = { opacity: 0.7, mr: 0.5, fontSize: '0.72rem' };
             const valueSx = { fontSize: '0.78rem', fontWeight: 500 };
@@ -119,13 +146,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                             </Typography>
                             <Tooltip title="Click to copy section code" placement="right">
                                 <Chip
-                                    onClick={(event) => {
-                                        clickToCopy(event, sectionCode);
-                                        logAnalytics(postHog, {
-                                            category: analyticsEnum.calendar,
-                                            action: analyticsEnum.calendar.actions.COPY_COURSE_CODE,
-                                        });
-                                    }}
+                                    onClick={handleCopySectionCode}
                                     label={sectionCode}
                                     size="small"
                                     sx={{ height: 18, fontSize: '0.68rem' }}
@@ -148,13 +169,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                                 {finalExamString}
                             </Typography>
                         </Box>
-                        <ColorPicker
-                            color={selectedEvent.color}
-                            isCustomEvent={false}
-                            sectionCode={sectionCode}
-                            term={term}
-                            analyticsCategory={analyticsEnum.calendar}
-                        />
+                        {colorPicker}
                     </Box>
                     <Box sx={{ display: 'flex', mb: 0.25 }}>
                         <Typography component="span" sx={labelSx}>
@@ -168,14 +183,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                         <Typography component="span" sx={labelSx}>
                             Location{locations.length > 1 && 's'}
                         </Typography>
-                        {locations.map((location) => (
-                            <Box key={`${sectionCode} @ ${location.building} ${location.room}`} sx={valueSx}>
-                                <MapLink
-                                    buildingId={locationIds[location.building] ?? '0'}
-                                    room={`${location.building} ${location.room}`}
-                                />
-                            </Box>
-                        ))}
+                        <Box sx={valueSx}>{locationLinks}</Box>
                     </Box>
                 </Box>
             );
@@ -190,17 +198,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                             <td style={{ verticalAlign: 'top' }}>Section code</td>
                             <Tooltip title="Click to copy section code" placement="right">
                                 <td style={{ textAlign: 'right' }}>
-                                    <Chip
-                                        onClick={(event) => {
-                                            clickToCopy(event, sectionCode);
-                                            logAnalytics(postHog, {
-                                                category: analyticsEnum.calendar,
-                                                action: analyticsEnum.calendar.actions.COPY_COURSE_CODE,
-                                            });
-                                        }}
-                                        label={sectionCode}
-                                        size="small"
-                                    />
+                                    <Chip onClick={handleCopySectionCode} label={sectionCode} size="small" />
                                 </td>
                             </Tooltip>
                         </tr>
@@ -214,16 +212,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                         </tr>
                         <tr>
                             <td style={{ verticalAlign: 'top' }}>Location{locations.length > 1 && 's'}</td>
-                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>
-                                {locations.map((location) => (
-                                    <div key={`${sectionCode} @ ${location.building} ${location.room}`}>
-                                        <MapLink
-                                            buildingId={locationIds[location.building] ?? '0'}
-                                            room={`${location.building} ${location.room}`}
-                                        />
-                                    </div>
-                                ))}
-                            </td>
+                            <td style={{ whiteSpace: 'pre', textAlign: 'right' }}>{locationLinks}</td>
                         </tr>
                         <tr>
                             <td>Final</td>
@@ -231,15 +220,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
                         </tr>
                         <tr>
                             <td>Color</td>
-                            <td style={{ textAlign: 'right' }}>
-                                <ColorPicker
-                                    color={selectedEvent.color}
-                                    isCustomEvent={false}
-                                    sectionCode={sectionCode}
-                                    term={term}
-                                    analyticsCategory={analyticsEnum.calendar}
-                                />
-                            </td>
+                            <td style={{ textAlign: 'right' }}>{colorPicker}</td>
                         </tr>
                     </tbody>
                 </table>
