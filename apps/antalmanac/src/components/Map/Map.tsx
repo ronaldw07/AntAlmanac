@@ -184,14 +184,14 @@ export function CourseMap() {
     const markerRef = useRef<Marker | null>(null);
     const classMarkerRefs = useRef(new globalThis.Map<string, Marker>());
     const isMobile = useIsMobile();
-    const [selectedDayIndex, setSelectedDay] = useState(() => {
+    // Stored by name, not tab index: weekend tabs can appear later and shift the indexes.
+    const [selectedDay, setSelectedDay] = useState(() => {
         if (!isMobile) {
-            return 0;
+            return 'All';
         }
         // On mobile, open on today's tab (Monday if today's tab isn't shown).
-        const initialDays = getDays(AppStore.getEventsInCalendar());
-        const todayIndex = initialDays.indexOf(WEEKDAY_ABBREVIATIONS[new Date().getDay()]);
-        return todayIndex === -1 ? initialDays.indexOf('Mon') : todayIndex;
+        const todayName = WEEKDAY_ABBREVIATIONS[new Date().getDay()];
+        return getDays(AppStore.getEventsInCalendar()).includes(todayName) ? todayName : 'Mon';
     });
     const lastHandledClickKeyRef = useRef<string | null>(null);
     const [pendingPopupSectionKey, setPendingPopupSectionKey] = useState<string | null>(null);
@@ -259,13 +259,6 @@ export function CourseMap() {
         };
     }, [searchParams]);
 
-    const handleChange = useCallback(
-        (_event: React.SyntheticEvent, newValue: number) => {
-            setSelectedDay(newValue);
-        },
-        [setSelectedDay]
-    );
-
     const onBuildingChange = useCallback(
         (building?: ExtendedBuilding | null) => {
             router.push(building ? `/map?location=${building.id}` : '/map');
@@ -275,9 +268,16 @@ export function CourseMap() {
 
     const days = useMemo(() => getDays(calendarEvents), [calendarEvents]);
 
-    const today = useMemo(() => {
-        return days[selectedDayIndex];
-    }, [days, selectedDayIndex]);
+    // Falls back to "All" if the stored day's tab is gone (e.g. weekend classes removed).
+    const selectedDayIndex = Math.max(days.indexOf(selectedDay), 0);
+    const today = days[selectedDayIndex];
+
+    const handleChange = useCallback(
+        (_event: React.SyntheticEvent, newValue: number) => {
+            setSelectedDay(days[newValue]);
+        },
+        [days]
+    );
 
     /**
      * Course events for the mobile bottom class strip, in order: the selected
@@ -378,7 +378,8 @@ export function CourseMap() {
      * switch re-runs this effect.
      */
     useEffect(() => {
-        if (!selectedEvent || !isCourseEvent(selectedEvent)) {
+        // The map only shows where classes meet, not final exam rooms, so finals don't jump.
+        if (!selectedEvent || !isCourseEvent(selectedEvent) || selectedEvent.sectionType === 'Fin') {
             lastHandledClickKeyRef.current = null;
             return;
         }
@@ -394,11 +395,10 @@ export function CourseMap() {
 
         // "All" already shows every class, so stay on it rather than jumping
         // to the clicked class's day.
-        const isAllTab = days[selectedDayIndex] === 'All';
-        const dayIndex = days.indexOf(eventDay);
+        const isAllTab = today === 'All';
 
-        if (!isAllTab && dayIndex !== -1 && dayIndex !== selectedDayIndex) {
-            setSelectedDay(dayIndex);
+        if (!isAllTab && days.includes(eventDay) && eventDay !== today) {
+            setSelectedDay(eventDay);
         }
 
         // On "All" there's one marker per section, so fly to that one — it's
@@ -428,7 +428,7 @@ export function CourseMap() {
         // covered by the day-tabs bar or the mobile day strip.
         map.current?.flyTo([marker.lat, marker.lng], 18, { duration: 0.25 });
         setPendingPopupSectionKey(sectionKey);
-    }, [selectedEvent, days, selectedDayIndex, markers, markersToDisplay]);
+    }, [selectedEvent, days, today, markers, markersToDisplay]);
 
     /**
      * Opens the popup for the clicked class once its marker has mounted for
