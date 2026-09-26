@@ -39,12 +39,13 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
             return null;
         }
         const activeKey = scheduleSectionKey(selectedEvent.term, selectedEvent.sectionCode);
-        // On "All" each class has a single chip, so any meeting of it matches.
+        // On "All" each class has a single chip, so any meeting of it matches. On a day tab, match
+        // the exact meeting: a class can meet more than once in a day.
         return (
             events.find(
                 (event) =>
                     scheduleSectionKey(event.term, event.sectionCode) === activeKey &&
-                    (daysBySection !== undefined || event.start.getDay() === selectedEvent.start.getDay())
+                    (daysBySection !== undefined || event.start.getTime() === selectedEvent.start.getTime())
             ) ?? null
         );
     }, [selectedEvent, events, daysBySection]);
