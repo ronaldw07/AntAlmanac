@@ -1,12 +1,16 @@
+import { useIsMobile } from '$hooks/useIsMobile';
 import analyticsEnum, { logAnalytics } from '$lib/analytics/analytics';
 import { DirectionsWalk as DirectionsWalkIcon, Info } from '@mui/icons-material';
 import { Box, Button, IconButton, Typography } from '@mui/material';
-import { type Marker, divIcon } from 'leaflet';
+import { type Marker, type PointTuple, divIcon } from 'leaflet';
 import { usePostHog } from 'posthog-js/react';
 import { type Ref, forwardRef } from 'react';
 import { Popup, Marker as ReactLeafletMarker } from 'react-leaflet';
 
 const GOOGLE_MAPS_URL = 'https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=';
+// On mobile, keep the popup clear of the day-tabs bar above and the class sheet below.
+const MOBILE_POPUP_PADDING_TOP_LEFT: PointTuple = [10, 170];
+const MOBILE_POPUP_PADDING_BOTTOM_RIGHT: PointTuple = [10, 190];
 const IMAGE_CMS_URL = 'https://cms.concept3d.com/map/lib/image-cache/i.php?mapId=463&image=';
 
 /**
@@ -75,6 +79,7 @@ interface Props {
 export const LocationMarker = forwardRef(
     ({ lat, lng, color, image, location, acronym, stackIndex, label, children }: Props, ref?: Ref<Marker>) => {
         const postHog = usePostHog();
+        const isMobile = useIsMobile();
 
         return (
             <ReactLeafletMarker
@@ -91,18 +96,21 @@ export const LocationMarker = forwardRef(
                     },
                 }}
             >
-                <Popup autoPan={true} autoPanPaddingTopLeft={[10, 170]} autoPanPaddingBottomRight={[10, 190]}>
+                <Popup
+                    autoPanPaddingTopLeft={isMobile ? MOBILE_POPUP_PADDING_TOP_LEFT : undefined}
+                    autoPanPaddingBottomRight={isMobile ? MOBILE_POPUP_PADDING_BOTTOM_RIGHT : undefined}
+                >
                     <Box
                         sx={{
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
-                            width: 190,
+                            width: isMobile ? 190 : 250,
                         }}
                     >
                         {image && (
                             <Box
-                                height={80}
+                                height={isMobile ? 80 : 150}
                                 borderRadius={'0.75rem 0.75rem 0 0'}
                                 component="img"
                                 src={`${IMAGE_CMS_URL}${image}`}
@@ -113,20 +121,31 @@ export const LocationMarker = forwardRef(
                             />
                         )}
 
-                        <Box display="flex" flexDirection="column" mx={1.25} my={0.75} gap={0.5}>
-                            <Box display="flex" flexDirection="column" gap={0.25}>
+                        <Box
+                            display="flex"
+                            flexDirection="column"
+                            mx={isMobile ? 1.25 : 2}
+                            my={isMobile ? 0.75 : 1.25}
+                            gap={isMobile ? 0.5 : 1}
+                        >
+                            <Box display="flex" flexDirection="column" gap={isMobile ? 0.25 : 0.5}>
                                 <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                    <Typography fontSize={'0.95rem'} lineHeight={1.2} fontWeight={600}>
+                                    <Typography
+                                        fontSize={isMobile ? '0.95rem' : '1.25rem'}
+                                        lineHeight={isMobile ? 1.2 : 1.25}
+                                        fontWeight={600}
+                                    >
                                         {location}
                                     </Typography>
                                     {location && (
                                         <IconButton
                                             href={`http://www.classrooms.uci.edu/classrooms/${acronym}`}
                                             target="_blank"
-                                            size="small"
+                                            size={isMobile ? 'small' : 'medium'}
+                                            aria-label="Classroom info"
                                             sx={{ padding: 0 }}
                                         >
-                                            <Info fontSize="small" color="primary" />
+                                            <Info fontSize={isMobile ? 'small' : 'large'} color="primary" />
                                         </IconButton>
                                     )}
                                 </Box>
@@ -137,7 +156,7 @@ export const LocationMarker = forwardRef(
                             <Button
                                 variant="contained"
                                 color="primary"
-                                size="small"
+                                size={isMobile ? 'small' : 'medium'}
                                 startIcon={
                                     <DirectionsWalkIcon sx={{ color: (theme) => theme.vars.palette.common.white }} />
                                 }
@@ -151,8 +170,8 @@ export const LocationMarker = forwardRef(
                             >
                                 <Typography
                                     sx={{
-                                        fontSize: '0.9rem',
-                                        letterSpacing: 0.75,
+                                        fontSize: isMobile ? '0.9rem' : '1.25rem',
+                                        letterSpacing: isMobile ? 0.75 : 1.25,
                                         fontWeight: 500,
                                         color: (theme) => theme.vars.palette.common.white,
                                     }}

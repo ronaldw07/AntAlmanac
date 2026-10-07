@@ -61,6 +61,9 @@ const mondayFirst = (weekday: number) => (weekday + 6) % 7;
 function getDays(events: CalendarEvent[]) {
     return events.some((event) => weekendIndices.includes(event.start.getDay())) ? FULL_WEEK : WORK_WEEK;
 }
+const CLASS_FOCUS_ZOOM = 18;
+const CLASS_FLY_DURATION_SECONDS = 0.25;
+const POPUP_OPEN_DELAY_MS = 250;
 const CAMPUS_CENTER: LatLngTuple = [33.6459, -117.842717];
 const CAMPUS_BOUND_DELTA = 0.018;
 const CAMPUS_BOUNDS: [LatLngTuple, LatLngTuple] = [
@@ -284,23 +287,26 @@ export function CourseMap() {
      * day's classes, or on "All" one entry per class (its first meeting of the
      * week).
      */
+    const courseEvents = useMemo(() => calendarEvents.filter(isCourseEvent), [calendarEvents]);
+
     const stripDayEvents = useMemo(() => {
-        const courseEvents = calendarEvents.filter(isCourseEvent).sort((a, b) => a.start.getTime() - b.start.getTime());
+        const sortedEvents = [...courseEvents].sort((a, b) => a.start.getTime() - b.start.getTime());
 
         if (today === 'All') {
-            return courseEvents.filter(
-                (event, index) =>
-                    courseEvents.findIndex(
-                        (other) =>
-                            scheduleSectionKey(other.term, other.sectionCode) ===
-                            scheduleSectionKey(event.term, event.sectionCode)
-                    ) === index
-            );
+            const seenSections = new Set<string>();
+            return sortedEvents.filter((event) => {
+                const key = scheduleSectionKey(event.term, event.sectionCode);
+                if (seenSections.has(key)) {
+                    return false;
+                }
+                seenSections.add(key);
+                return true;
+            });
         }
 
         const weekday = WEEKDAY_ABBREVIATIONS.indexOf(today);
-        return courseEvents.filter((event) => event.start.getDay() === weekday);
-    }, [calendarEvents, today]);
+        return sortedEvents.filter((event) => event.start.getDay() === weekday);
+    }, [courseEvents, today]);
 
     /** On "All", each class's meeting days (e.g. "MWF"), keyed by section, to label its strip chip. */
     const stripDaysBySection = useMemo(() => {
@@ -309,7 +315,7 @@ export function CourseMap() {
         }
 
         const weekdaysBySection: Record<string, number[]> = {};
-        for (const event of calendarEvents.filter(isCourseEvent)) {
+        for (const event of courseEvents) {
             const key = scheduleSectionKey(event.term, event.sectionCode);
             const weekday = event.start.getDay();
             const weekdays = weekdaysBySection[key] ?? [];
@@ -327,7 +333,7 @@ export function CourseMap() {
                     .join(''),
             ])
         );
-    }, [calendarEvents, today]);
+    }, [courseEvents, today]);
 
     const focusedLocation = useMemo(() => {
         const locationID = Number(searchParams.get('location') ?? 0);
@@ -426,7 +432,7 @@ export function CourseMap() {
         // flyTo's `duration` is in seconds, not ms. The popup's own autoPan
         // (see Marker.tsx) nudges the map afterward if the card would be
         // covered by the day-tabs bar or the mobile day strip.
-        map.current?.flyTo([marker.lat, marker.lng], 18, { duration: 0.25 });
+        map.current?.flyTo([marker.lat, marker.lng], CLASS_FOCUS_ZOOM, { duration: CLASS_FLY_DURATION_SECONDS });
         setPendingPopupSectionKey(sectionKey);
     }, [selectedEvent, days, today, markers, markersToDisplay]);
 
@@ -451,7 +457,7 @@ export function CourseMap() {
         const timeoutId = window.setTimeout(() => {
             marker.openPopup();
             setPendingPopupSectionKey(null);
-        }, 250);
+        }, POPUP_OPEN_DELAY_MS);
 
         return () => {
             window.clearTimeout(timeoutId);
@@ -510,137 +516,144 @@ export function CourseMap() {
     );
 
     return (
-        <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }} id="map-pane">
-                <MapContainer
-                    ref={map}
-                    center={CAMPUS_CENTER}
-                    zoom={16}
-                    style={{ height: '100%' }}
-                    maxBounds={CAMPUS_BOUNDS}
-                    maxBoundsViscosity={1}
-                >
-                    {/* Menu floats above the map. */}
-                    <Paper sx={{ position: 'relative', mx: 'auto', my: 2, width: '70%', zIndex: 400 }}>
-                        <Tabs
-                            value={selectedDayIndex}
-                            onChange={handleChange}
-                            variant="fullWidth"
-                            sx={{ minHeight: 0 }}
-                            textColor="secondary"
-                            indicatorColor="secondary"
-                        >
-                            {days.map((day) => (
-                                <Tab key={day} label={day} sx={{ padding: 1, minHeight: 'auto', minWidth: '10%' }} />
-                            ))}
-                        </Tabs>
-                        <BuildingSelect
-                            value={searchParams.get('location') ?? undefined}
-                            onChange={onBuildingChange}
-                            variant="filled"
-                        />
-                    </Paper>
-
-                    <TileLayer
-                        attribution={ATTRIBUTION_MARKUP}
-                        url={`https://${TILES_URL}/{z}/{x}/{y}.png`}
-                        tileSize={512}
-                        maxZoom={21}
-                        minZoom={15}
-                        zoomOffset={-1}
-                    />
-
-                    <UserLocator />
-
-                    {/* Draw out routes if the user is viewing a specific day. */}
-                    {today !== 'All' &&
-                        routes.map(({ key, latLngTuples, color }) => (
-                            <Routes key={key} latLngTuples={latLngTuples} color={color} />
+        <Box
+            sx={{
+                position: 'relative',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                flexGrow: 1,
+                height: '100%',
+            }}
+            id="map-pane"
+        >
+            <MapContainer
+                ref={map}
+                center={CAMPUS_CENTER}
+                zoom={16}
+                style={{ height: '100%' }}
+                maxBounds={CAMPUS_BOUNDS}
+                maxBoundsViscosity={1}
+            >
+                {/* Menu floats above the map. */}
+                <Paper sx={{ position: 'relative', mx: 'auto', my: 2, width: '70%', zIndex: 400 }}>
+                    <Tabs
+                        value={selectedDayIndex}
+                        onChange={handleChange}
+                        variant="fullWidth"
+                        sx={{ minHeight: 0 }}
+                        textColor="secondary"
+                        indicatorColor="secondary"
+                    >
+                        {days.map((day) => (
+                            <Tab key={day} label={day} sx={{ padding: 1, minHeight: 'auto', minWidth: '10%' }} />
                         ))}
+                    </Tabs>
+                    <BuildingSelect
+                        value={searchParams.get('location') ?? undefined}
+                        onChange={onBuildingChange}
+                        variant="filled"
+                    />
+                </Paper>
 
-                    {/* Draw a marker for each class that occurs today. */}
-                    {(() => {
-                        const stackCountByPrimaryBuilding: Record<string, number> = {};
-                        return markersToDisplay.map((marker, index) => {
-                            const primaryBuilding = marker.locations[0].building;
-                            const stackIndex = stackCountByPrimaryBuilding[primaryBuilding] ?? 0;
-                            stackCountByPrimaryBuilding[primaryBuilding] = stackIndex + 1;
+                <TileLayer
+                    attribution={ATTRIBUTION_MARKUP}
+                    url={`https://${TILES_URL}/{z}/{x}/{y}.png`}
+                    tileSize={512}
+                    maxZoom={21}
+                    minZoom={15}
+                    zoomOffset={-1}
+                />
 
-                            const allRoomsInBuilding = marker.locations
-                                .filter((location) => location.building === primaryBuilding)
-                                .reduce((roomList, location) => [...roomList, location.room], [] as string[]);
+                <UserLocator />
 
-                            const sectionKey = scheduleSectionKey(marker.term, marker.sectionCode);
+                {/* Draw out routes if the user is viewing a specific day. */}
+                {today !== 'All' &&
+                    routes.map(({ key, latLngTuples, color }) => (
+                        <Routes key={key} latLngTuples={latLngTuples} color={color} />
+                    ))}
 
-                            return (
-                                <Fragment key={sectionKey}>
-                                    <LocationMarker
-                                        {...marker}
-                                        label={today === 'All' ? undefined : (index + 1).toString()}
-                                        stackIndex={stackIndex}
-                                        ref={(instance) => {
-                                            if (instance) {
-                                                classMarkerRefs.current.set(sectionKey, instance);
-                                            } else {
-                                                classMarkerRefs.current.delete(sectionKey);
-                                            }
-                                        }}
-                                    >
-                                        <Box>
-                                            <Typography variant="body2">
-                                                <span style={{ fontWeight: 'bold' }}>Class:</span> {marker.title}{' '}
-                                                {marker.sectionType}
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                <span style={{ fontWeight: 'bold' }}>
-                                                    Room{allRoomsInBuilding.length > 1 && 's'}:
-                                                </span>{' '}
-                                                {marker.locations[0].building} {allRoomsInBuilding.join('/')}
-                                            </Typography>
-                                        </Box>
-                                    </LocationMarker>
-                                </Fragment>
-                            );
-                        });
-                    })()}
+                {/* Draw a marker for each class that occurs today. */}
+                {(() => {
+                    const stackCountByPrimaryBuilding: Record<string, number> = {};
+                    return markersToDisplay.map((marker, index) => {
+                        const primaryBuilding = marker.locations[0].building;
+                        const stackIndex = stackCountByPrimaryBuilding[primaryBuilding] ?? 0;
+                        stackCountByPrimaryBuilding[primaryBuilding] = stackIndex + 1;
 
-                    {/* Draw a marker for each custom Event that occurs today. */}
-                    {customEventMarkersToDisplay.map((customEventMarkers, index) => {
-                        const customEventSameBuildingPrior = customEventMarkersToDisplay.slice(0, index);
+                        const allRoomsInBuilding = marker.locations
+                            .filter((location) => location.building === primaryBuilding)
+                            .reduce((roomList, location) => [...roomList, location.room], [] as string[]);
+
+                        const sectionKey = scheduleSectionKey(marker.term, marker.sectionCode);
 
                         return (
-                            <Fragment key={customEventMarkers.markerKey}>
+                            <Fragment key={sectionKey}>
                                 <LocationMarker
-                                    {...customEventMarkers}
-                                    label={'E'}
-                                    stackIndex={customEventSameBuildingPrior.length}
+                                    {...marker}
+                                    label={today === 'All' ? undefined : (index + 1).toString()}
+                                    stackIndex={stackIndex}
+                                    ref={(instance) => {
+                                        if (instance) {
+                                            classMarkerRefs.current.set(sectionKey, instance);
+                                        } else {
+                                            classMarkerRefs.current.delete(sectionKey);
+                                        }
+                                    }}
                                 >
                                     <Box>
                                         <Typography variant="body2">
-                                            <span style={{ fontWeight: 'bold' }}>Event:</span>{' '}
-                                            {customEventMarkers.title}
+                                            <span style={{ fontWeight: 'bold' }}>Class:</span> {marker.title}{' '}
+                                            {marker.sectionType}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            <span style={{ fontWeight: 'bold' }}>
+                                                Room{allRoomsInBuilding.length > 1 && 's'}:
+                                            </span>{' '}
+                                            {marker.locations[0].building} {allRoomsInBuilding.join('/')}
                                         </Typography>
                                     </Box>
                                 </LocationMarker>
                             </Fragment>
                         );
-                    })}
+                    });
+                })()}
 
-                    {/* Render an additional marker if the user searched up a location. */}
-                    {/* A unique key based on the building is used to make sure the previous marker un-renders. */}
-                    {focusedLocation && (
-                        <LocationMarker
-                            key={focusedLocation.name}
-                            {...focusedLocation}
-                            label="!"
-                            color="red"
-                            location={focusedLocation.name}
-                            image={focusedLocation.imageURLs?.[0]}
-                            ref={markerRef}
-                        />
-                    )}
-                </MapContainer>
-            </Box>
+                {/* Draw a marker for each custom Event that occurs today. */}
+                {customEventMarkersToDisplay.map((customEventMarkers, index) => {
+                    const customEventSameBuildingPrior = customEventMarkersToDisplay.slice(0, index);
+
+                    return (
+                        <Fragment key={customEventMarkers.markerKey}>
+                            <LocationMarker
+                                {...customEventMarkers}
+                                label={'E'}
+                                stackIndex={customEventSameBuildingPrior.length}
+                            >
+                                <Box>
+                                    <Typography variant="body2">
+                                        <span style={{ fontWeight: 'bold' }}>Event:</span> {customEventMarkers.title}
+                                    </Typography>
+                                </Box>
+                            </LocationMarker>
+                        </Fragment>
+                    );
+                })}
+
+                {/* Render an additional marker if the user searched up a location. */}
+                {/* A unique key based on the building is used to make sure the previous marker un-renders. */}
+                {focusedLocation && (
+                    <LocationMarker
+                        key={focusedLocation.name}
+                        {...focusedLocation}
+                        label="!"
+                        color="red"
+                        location={focusedLocation.name}
+                        image={focusedLocation.imageURLs?.[0]}
+                        ref={markerRef}
+                    />
+                )}
+            </MapContainer>
 
             {isMobile && <MobileDayStrip events={stripDayEvents} daysBySection={stripDaysBySection} />}
         </Box>
