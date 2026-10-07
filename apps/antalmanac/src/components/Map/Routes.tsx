@@ -131,6 +131,10 @@ export function Routes(props: ClassRoutesProps) {
         routerControl.hide();
 
         return () => {
+            // Bump the request counter so a route request still in flight is ignored when it resolves.
+            // leaflet-routing-machine only drops stale responses this way, and otherwise touches the
+            // removed control's null map and throws.
+            (routerControl as unknown as { _requestCount: number })._requestCount++;
             routerControl.remove();
         };
     }, [map, props.latLngTuples, props.color]);

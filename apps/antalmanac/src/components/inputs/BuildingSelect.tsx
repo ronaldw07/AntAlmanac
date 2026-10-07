@@ -38,8 +38,9 @@ export function BuildingSelect(props: BuildingSelectProps) {
     );
 
     const value = useMemo(() => {
+        // null, not undefined: undefined flips Autocomplete to uncontrolled and still counts as a selection.
         if (props.value == null) {
-            return;
+            return null;
         }
 
         const building = buildingCatalogue[Number(props.value)];
@@ -57,6 +58,15 @@ export function BuildingSelect(props: BuildingSelectProps) {
             isOptionEqualToValue={(option, value) => option.id === value?.id}
             getOptionLabel={(option) => option.name ?? ''}
             onChange={handleChange}
+            sx={{
+                // MUI shows the clear button only on hover or while focused. Touch has no hover, and
+                // Leaflet steals focus on mousedown inside the map, hiding it mid-tap so the tap misses.
+                '@media (pointer: coarse)': {
+                    '& .MuiAutocomplete-clearIndicator': {
+                        visibility: 'visible',
+                    },
+                },
+            }}
             renderInput={(params) => (
                 <TextField
                     {...params}
