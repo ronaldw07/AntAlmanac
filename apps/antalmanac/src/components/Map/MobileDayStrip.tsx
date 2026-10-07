@@ -4,6 +4,7 @@ import { CalendarEventDetail } from '$components/Calendar/CalendarEvent/Calendar
 import { type CourseEvent, isCourseEvent } from '$components/Calendar/types';
 import { scheduleSectionKey } from '$stores/scheduleHelpers';
 import { useSelectedEventStore } from '$stores/SelectedEventStore';
+import { useTimeFormatStore } from '$stores/SettingsStore';
 import { ExpandMore } from '@mui/icons-material';
 import { Box, Collapse, Divider, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns';
@@ -17,6 +18,10 @@ interface MobileDayStripProps {
 }
 
 const SCROLL_END_TOLERANCE_PX = 1;
+const SHEET_BOTTOM_OFFSET_PX = 60; // clears the mobile bottom tab bar
+const SHEET_Z_INDEX = 450; // above the map's panes, below the day-tabs bar
+const CHIP_MIN_WIDTH_PX = 120;
+const SCROLL_FADE_WIDTH_PX = 32;
 
 /**
  * Mobile map bottom sheet: one panel holding the selected day's classes (or,
@@ -32,6 +37,8 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
     );
     const containerRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
+    const isMilitaryTime = useTimeFormatStore((store) => store.isMilitaryTime);
+    const timeFormat = isMilitaryTime ? 'HH:mm' : 'h:mm a';
     const [canScrollRight, setCanScrollRight] = useState(false);
 
     const activeEvent = useMemo(() => {
@@ -87,10 +94,10 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
         <Paper
             sx={{
                 position: 'absolute',
-                bottom: 60,
+                bottom: SHEET_BOTTOM_OFFSET_PX,
                 left: 12,
                 right: 12,
-                zIndex: 450,
+                zIndex: SHEET_Z_INDEX,
                 borderRadius: '16px',
                 p: 0.75,
                 overflow: 'hidden',
@@ -110,6 +117,7 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
                         color: 'text.secondary',
                         cursor: 'pointer',
                         mb: 0.25,
+                        py: 0.5,
                         lineHeight: 0,
                     }}
                 >
@@ -146,7 +154,7 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
 
                         return (
                             <Box
-                                key={`${event.term.shortName}-${event.sectionCode}-${event.start.getTime()}`}
+                                key={`${scheduleSectionKey(event.term, event.sectionCode)}-${event.start.getTime()}`}
                                 component="button"
                                 onClick={() => handleChipClick(event)}
                                 aria-pressed={activeEvent === event}
@@ -154,14 +162,14 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
                                     flexShrink: 0,
                                     textAlign: 'left',
                                     border: '2px solid',
-                                    borderColor: activeEvent === event ? 'white' : 'transparent',
+                                    borderColor: activeEvent === event ? 'currentColor' : 'transparent',
                                     borderRadius: 2,
                                     boxShadow: 4,
                                     px: 1.5,
                                     py: 1,
-                                    minWidth: 120,
+                                    minWidth: CHIP_MIN_WIDTH_PX,
                                     bgcolor: event.color,
-                                    color: 'white',
+                                    color: theme.palette.getContrastText(event.color),
                                     cursor: 'pointer',
                                 }}
                             >
@@ -171,7 +179,7 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
                                 >
                                     {daysBySection &&
                                         `${daysBySection[scheduleSectionKey(event.term, event.sectionCode)]} `}
-                                    {format(event.start, 'h:mm a')} – {format(event.end, 'h:mm a')}
+                                    {format(event.start, timeFormat)} – {format(event.end, timeFormat)}
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                                     {event.title}
@@ -192,7 +200,7 @@ export function MobileDayStrip({ events, daysBySection }: MobileDayStripProps) {
                             top: 0,
                             bottom: 0,
                             right: 0,
-                            width: 32,
+                            width: SCROLL_FADE_WIDTH_PX,
                             pointerEvents: 'none',
                             background: `linear-gradient(to right, transparent, ${theme.vars.palette.background.paper})`,
                         }}

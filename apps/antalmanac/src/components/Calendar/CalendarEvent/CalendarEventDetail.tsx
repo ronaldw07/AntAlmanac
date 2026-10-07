@@ -128,7 +128,7 @@ export function CalendarEventDetail({ selectedEvent, closePopover, embedded = fa
             const valueSx = { fontSize: '0.78rem', fontWeight: 500 };
 
             return (
-                <Box ref={paperRef}>
+                <Box>
                     {header}
                     <Box
                         sx={{
